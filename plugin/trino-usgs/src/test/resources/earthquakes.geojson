@@ -1,0 +1,9 @@
+{
+  "type": "FeatureCollection",
+  "metadata": {"count": 3, "generated": 1700000002000, "future_field": true},
+  "features": [
+    {"type":"Feature","id":"strong","properties":{"mag":6.2,"place":"Near Hawaiʻi","time":1700000000123,"updated":1700000001456,"magType":"mww","type":"earthquake","status":"reviewed","tsunami":1,"url":"https://example.com/strong","sig":600,"felt":12,"ignored":"new field"},"geometry":{"type":"Point","coordinates":[-155.5,19.25,10.75]}},
+    {"type":"Feature","id":"small","properties":{"mag":-0.4,"place":"Alaska","time":1700000000000,"type":"earthquake","tsunami":0},"geometry":{"type":"Point","coordinates":[-150.0,61.0,-1.5]}},
+    {"type":"Feature","id":"unknown","properties":{"mag":null,"place":null,"time":null,"felt":null},"geometry":null}
+  ]
+}

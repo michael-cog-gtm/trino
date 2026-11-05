@@ -313,4 +313,9 @@
             <unpack />
         </artifact>
     </artifactSet>
+    <artifactSet to="plugin/usgs">
+        <artifact id="${project.groupId}:trino-usgs:zip:${project.version}">
+            <unpack />
+        </artifact>
+    </artifactSet>
 </runtime>
