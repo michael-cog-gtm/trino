@@ -1086,6 +1086,7 @@ public class TestBinPackingNodeAllocator
             nodeAllocatorService.processPendingAcquires();
             assertNotAcquired(acquireNoNodes);
             ticker.increment(61, TimeUnit.SECONDS);
+            nodeAllocatorService.processPendingAcquires();
             assertEventually(() -> assertThatThrownBy(() -> getFutureValue(acquireNoNodes.getNode()))
                     .hasMessage("No nodes available to run query"));
         }
