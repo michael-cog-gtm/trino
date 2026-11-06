@@ -227,12 +227,7 @@ public class TestSqlTaskManagerRaceWithCatalogPrune
                         PipelinedOutputBuffers.createInitial(PARTITIONED).withBuffer(OUT, 0).withNoMoreBufferIds(),
                         ImmutableMap.of(),
                         false);
-                try {
-                    Thread.sleep(0, ThreadLocalRandom.current().nextInt(25, 75));
-                }
-                catch (InterruptedException e) {
-                    throw new RuntimeException(e);
-                }
+                randomJitter();
                 assertThatCode(() -> workerConnectorServiceProvider.getConnectorServices(catalogHandle))
                         .doesNotThrowAnyException();
                 workerTaskManager.cancelTask(taskId);
@@ -245,12 +240,7 @@ public class TestSqlTaskManagerRaceWithCatalogPrune
         Future<Void> pruneCatalogsFuture = Futures.submit(() -> {
             for (int i = 0; i < NUM_TASKS; i++) {
                 catalogPruneTask.pruneCatalogs();
-                try {
-                    Thread.sleep(0, ThreadLocalRandom.current().nextInt(25, 75));
-                }
-                catch (InterruptedException e) {
-                    throw new RuntimeException(e);
-                }
+                randomJitter();
             }
         }, threadPoolExecutor);
 
@@ -263,6 +253,14 @@ public class TestSqlTaskManagerRaceWithCatalogPrune
     private TaskId newTaskId()
     {
         return new TaskId(new StageId("query" + sequence.incrementAndGet(), 0), 1, 0);
+    }
+
+    private static void randomJitter()
+    {
+        long end = System.nanoTime() + ThreadLocalRandom.current().nextInt(25, 75);
+        while (System.nanoTime() < end) {
+            Thread.onSpinWait();
+        }
     }
 
     private static SqlTaskManager getWorkerTaskManagerWithConnectorServiceProvider(ConnectorServicesProvider workerConnectorServiceProvider)
