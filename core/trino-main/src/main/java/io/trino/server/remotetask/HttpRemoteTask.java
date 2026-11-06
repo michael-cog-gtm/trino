@@ -749,6 +749,10 @@ public final class HttpRemoteTask
             sendUpdateInternal();
         }
         catch (Throwable e) {
+            if (httpClient.isClosed()) {
+                fatalUnacknowledgedFailure(new TrinoException(REMOTE_TASK_ERROR, format("Unable to update task %s. HTTP client is closed.", taskId), e));
+                return;
+            }
             fatalUnacknowledgedFailure(new TrinoException(GENERIC_INTERNAL_ERROR, "unexpected error calling sendUpdate()", e));
         }
     }
