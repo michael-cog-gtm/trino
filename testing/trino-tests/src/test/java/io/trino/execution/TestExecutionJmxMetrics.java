@@ -20,6 +20,8 @@ import io.trino.plugin.resourcegroups.ResourceGroupManagerPlugin;
 import io.trino.spi.QueryId;
 import io.trino.testing.QueryRunner;
 import io.trino.tests.tpch.TpchQueryRunner;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
 
@@ -39,47 +41,63 @@ public class TestExecutionJmxMetrics
 {
     private static final String LONG_RUNNING_QUERY = "SELECT COUNT(*) FROM tpch.sf100000.lineitem";
 
+    private QueryRunner queryRunner;
+
+    @BeforeEach
+    public void setUp()
+            throws Exception
+    {
+        queryRunner = TpchQueryRunner.builder().build();
+    }
+
+    @AfterEach
+    public void tearDown()
+    {
+        if (queryRunner != null) {
+            queryRunner.close();
+            queryRunner = null;
+        }
+    }
+
     @Test
     @Timeout(30)
     public void testQueryStats()
             throws Exception
     {
-        try (QueryRunner queryRunner = TpchQueryRunner.builder().build()) {
-            queryRunner.installPlugin(new ResourceGroupManagerPlugin());
-            InternalResourceGroupManager<?> resourceGroupManager = queryRunner.getCoordinator().getResourceGroupManager()
-                    .orElseThrow(() -> new IllegalStateException("Resource manager not configured"));
-            resourceGroupManager.setConfigurationManager(
-                    "file",
-                    ImmutableMap.of(
-                            "resource-groups.config-file", getClass().getClassLoader().getResource("resource_groups_single_query.json").getPath()));
-            MBeanServer mbeanServer = queryRunner.getCoordinator().getMbeanServer();
+        queryRunner.installPlugin(new ResourceGroupManagerPlugin());
+        InternalResourceGroupManager<?> resourceGroupManager = queryRunner.getCoordinator().getResourceGroupManager()
+                .orElseThrow(() -> new IllegalStateException("Resource manager not configured"));
+        resourceGroupManager.setConfigurationManager(
+                "file",
+                ImmutableMap.of(
+                        "resource-groups.config-file", getClass().getClassLoader().getResource("resource_groups_single_query.json").getPath()));
+        MBeanServer mbeanServer = queryRunner.getCoordinator().getMbeanServer();
 
-            QueryId firstDashboardQuery = createQuery(queryRunner, dashboardSession(), LONG_RUNNING_QUERY);
-            waitForQueryState(queryRunner, firstDashboardQuery, RUNNING);
+        QueryId firstDashboardQuery = createQuery(queryRunner, dashboardSession(), LONG_RUNNING_QUERY);
+        waitForQueryState(queryRunner, firstDashboardQuery, RUNNING);
 
-            assertThat(getMbeanAttribute(mbeanServer, "RunningQueries")).isEqualTo(1);
-            assertThat(getMbeanAttribute(mbeanServer, "QueuedQueries")).isEqualTo(0);
+        assertThat(getMbeanAttribute(mbeanServer, "RunningQueries")).isEqualTo(1);
+        assertThat(getMbeanAttribute(mbeanServer, "QueuedQueries")).isEqualTo(0);
 
-            // the second "dashboard" query can't run right away because the resource group has a hardConcurrencyLimit of 1
-            QueryId secondDashboardQuery = createQuery(queryRunner, dashboardSession(), LONG_RUNNING_QUERY);
-            waitForQueryState(queryRunner, secondDashboardQuery, QUEUED);
+        // the second "dashboard" query can't run right away because the resource group has a hardConcurrencyLimit of 1
+        QueryId secondDashboardQuery = createQuery(queryRunner, dashboardSession(), LONG_RUNNING_QUERY);
+        waitForQueryState(queryRunner, secondDashboardQuery, QUEUED);
 
-            assertThat(getMbeanAttribute(mbeanServer, "RunningQueries")).isEqualTo(1);
-            assertThat(getMbeanAttribute(mbeanServer, "QueuedQueries")).isEqualTo(1);
+        assertThat(getMbeanAttribute(mbeanServer, "RunningQueries")).isEqualTo(1);
+        assertThat(getMbeanAttribute(mbeanServer, "QueuedQueries")).isEqualTo(1);
 
-            cancelQuery(queryRunner, secondDashboardQuery);
-            waitForQueryState(queryRunner, secondDashboardQuery, FAILED);
+        cancelQuery(queryRunner, secondDashboardQuery);
+        waitForQueryState(queryRunner, secondDashboardQuery, FAILED);
 
-            assertThat(getMbeanAttribute(mbeanServer, "RunningQueries")).isEqualTo(1);
-            assertThat(getMbeanAttribute(mbeanServer, "QueuedQueries")).isEqualTo(0);
+        assertThat(getMbeanAttribute(mbeanServer, "RunningQueries")).isEqualTo(1);
+        assertThat(getMbeanAttribute(mbeanServer, "QueuedQueries")).isEqualTo(0);
 
-            // cancel the running query to avoid polluting the logs with meaningless stack traces
-            try {
-                cancelQuery(queryRunner, firstDashboardQuery);
-                waitForQueryState(queryRunner, firstDashboardQuery, FAILED);
-            }
-            catch (Exception ignore) {
-            }
+        // cancel the running query to avoid polluting the logs with meaningless stack traces
+        try {
+            cancelQuery(queryRunner, firstDashboardQuery);
+            waitForQueryState(queryRunner, firstDashboardQuery, FAILED);
+        }
+        catch (Exception ignore) {
         }
     }
 
