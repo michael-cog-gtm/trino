@@ -44,16 +44,28 @@ public class TpchNodePartitioningProvider
 {
     private final NodeManager nodeManager;
     private final int splitsPerNode;
+    private final TpchQueryNodeCount queryNodeCount;
 
     @Inject
+    public TpchNodePartitioningProvider(NodeManager nodeManager, TpchConfig config, TpchQueryNodeCount queryNodeCount)
+    {
+        this(nodeManager, requireNonNull(config, "config is null").getSplitsPerNode(), queryNodeCount);
+    }
+
     public TpchNodePartitioningProvider(NodeManager nodeManager, TpchConfig config)
     {
-        this(requireNonNull(nodeManager, "nodeManager is null"), requireNonNull(config, "config is null").getSplitsPerNode());
+        this(nodeManager, config.getSplitsPerNode());
     }
 
     public TpchNodePartitioningProvider(NodeManager nodeManager, int splitsPerNode)
     {
-        this.nodeManager = nodeManager;
+        this(nodeManager, splitsPerNode, new TpchQueryNodeCount());
+    }
+
+    public TpchNodePartitioningProvider(NodeManager nodeManager, int splitsPerNode, TpchQueryNodeCount queryNodeCount)
+    {
+        this.nodeManager = requireNonNull(nodeManager, "nodeManager is null");
+        this.queryNodeCount = requireNonNull(queryNodeCount, "queryNodeCount is null");
         checkArgument(splitsPerNode > 0, "splitsPerNode must be at least 1");
         this.splitsPerNode = splitsPerNode;
     }
@@ -68,10 +80,9 @@ public class TpchNodePartitioningProvider
                 .sorted(comparing(node -> node.getHostAndPort().toString()))
                 .collect(toImmutableList());
         ImmutableList.Builder<Node> bucketToNode = ImmutableList.builder();
-        for (Node node : sortedNodes) {
-            for (int i = 0; i < splitsPerNode; i++) {
-                bucketToNode.add(node);
-            }
+        int totalParts = queryNodeCount.nodeCount(session, nodes.size()) * splitsPerNode;
+        for (int i = 0; i < totalParts; i++) {
+            bucketToNode.add(sortedNodes.get((i / splitsPerNode) % sortedNodes.size()));
         }
         return Optional.of(createBucketNodeMap(bucketToNode.build()));
     }

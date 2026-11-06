@@ -44,6 +44,7 @@ public class TpchModule
         binder.bind(ConnectorPageSourceProvider.class).to(TpchPageSourceProvider.class).in(Scopes.SINGLETON);
         binder.bind(ConnectorSplitManager.class).to(TpchSplitManager.class).in(Scopes.SINGLETON);
         binder.bind(ConnectorNodePartitioningProvider.class).to(TpchNodePartitioningProvider.class).in(Scopes.SINGLETON);
+        binder.bind(TpchQueryNodeCount.class).in(Scopes.SINGLETON);
 
         configBinder(binder).bindConfig(TpchConfig.class);
         configBinder(binder).bindConfigDefaults(TpchConfig.class, config -> {

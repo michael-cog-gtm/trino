@@ -40,16 +40,28 @@ public class TpchSplitManager
 {
     private final NodeManager nodeManager;
     private final int splitsPerNode;
+    private final TpchQueryNodeCount queryNodeCount;
 
     @Inject
+    public TpchSplitManager(NodeManager nodeManager, TpchConfig config, TpchQueryNodeCount queryNodeCount)
+    {
+        this(nodeManager, requireNonNull(config, "config is null").getSplitsPerNode(), queryNodeCount);
+    }
+
     public TpchSplitManager(NodeManager nodeManager, TpchConfig config)
     {
-        this(requireNonNull(nodeManager, "nodeManager is null"), requireNonNull(config, "config is null").getSplitsPerNode());
+        this(nodeManager, config.getSplitsPerNode());
     }
 
     public TpchSplitManager(NodeManager nodeManager, int splitsPerNode)
     {
-        this.nodeManager = nodeManager;
+        this(nodeManager, splitsPerNode, new TpchQueryNodeCount());
+    }
+
+    public TpchSplitManager(NodeManager nodeManager, int splitsPerNode, TpchQueryNodeCount queryNodeCount)
+    {
+        this.nodeManager = requireNonNull(nodeManager, "nodeManager is null");
+        this.queryNodeCount = requireNonNull(queryNodeCount, "queryNodeCount is null");
         checkArgument(splitsPerNode > 0, "splitsPerNode must be at least 1");
         this.splitsPerNode = splitsPerNode;
     }
@@ -64,8 +76,7 @@ public class TpchSplitManager
     {
         Set<Node> nodes = nodeManager.getRequiredWorkerNodes();
 
-        int totalParts = nodes.size() * splitsPerNode;
-        int partNumber = 0;
+        int totalParts = queryNodeCount.nodeCount(session, nodes.size()) * splitsPerNode;
 
         // sort to ensure the assignment is consistent with TpchNodePartitioningProvider
         List<Node> sortedNodes = nodes.stream()
@@ -74,11 +85,9 @@ public class TpchSplitManager
 
         // Split the data using split and skew by the number of nodes available.
         ImmutableList.Builder<ConnectorSplit> splits = ImmutableList.builder();
-        for (Node node : sortedNodes) {
-            for (int i = 0; i < splitsPerNode; i++) {
-                splits.add(new TpchSplit(partNumber, totalParts, ImmutableList.of(node.getHostAndPort())));
-                partNumber++;
-            }
+        for (int partNumber = 0; partNumber < totalParts; partNumber++) {
+            Node node = sortedNodes.get((partNumber / splitsPerNode) % sortedNodes.size());
+            splits.add(new TpchSplit(partNumber, totalParts, ImmutableList.of(node.getHostAndPort())));
         }
         return new FixedSplitSource(splits.build());
     }
