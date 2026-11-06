@@ -24,13 +24,18 @@ import static java.time.Duration.ofDays;
 public class TpchQueryNodeCount
 {
     private final Cache<String, Integer> nodeCounts = EvictableCacheBuilder.newBuilder()
-            .maximumSize(10_000)
-            .expireAfterWrite(ofDays(1))
+            .maximumSize(1_000_000)
+            .expireAfterWrite(ofDays(365))
             .build();
 
     public int nodeCount(ConnectorSession session, int currentNodeCount)
     {
         checkArgument(currentNodeCount > 0, "No TPCH nodes available");
         return uncheckedCacheGet(nodeCounts, session.getQueryId(), () -> currentNodeCount);
+    }
+
+    public void cleanupQuery(ConnectorSession session)
+    {
+        nodeCounts.invalidate(session.getQueryId());
     }
 }

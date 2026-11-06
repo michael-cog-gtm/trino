@@ -13,9 +13,11 @@
  */
 package io.trino.plugin.tpch;
 
+import io.airlift.json.JsonMapperProvider;
 import io.trino.spi.HostAddress;
 import io.trino.spi.Node;
 import io.trino.spi.NodeManager;
+import io.trino.spi.connector.ConnectorExpressionEvaluator;
 import io.trino.spi.connector.ConnectorSession;
 import io.trino.spi.connector.Constraint;
 import io.trino.spi.security.ConnectorIdentity;
@@ -33,6 +35,23 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 class TestTpchQueryNodeCount
 {
+    @Test
+    void testCleanupQuery()
+    {
+        TpchQueryNodeCount counts = new TpchQueryNodeCount();
+        TpchMetadata metadata = new TpchMetadata(new TpchConfig(), new JsonMapperProvider().get(), ConnectorExpressionEvaluator.NO_OP, counts);
+        ConnectorSession session = new TestingSession("query");
+        ConnectorSession otherSession = new TestingSession("other");
+        metadata.cleanupQuery(session);
+        assertThat(counts.nodeCount(session, 3)).isEqualTo(3);
+        assertThat(counts.nodeCount(otherSession, 3)).isEqualTo(3);
+        assertThat(counts.nodeCount(session, 2)).isEqualTo(3);
+        metadata.cleanupQuery(session);
+        metadata.cleanupQuery(session);
+        assertThat(counts.nodeCount(session, 2)).isEqualTo(2);
+        assertThat(counts.nodeCount(otherSession, 2)).isEqualTo(3);
+    }
+
     @Test
     void testTopologyChanges()
             throws Exception
