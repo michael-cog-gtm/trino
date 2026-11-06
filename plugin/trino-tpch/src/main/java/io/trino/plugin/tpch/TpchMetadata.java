@@ -131,6 +131,7 @@ public class TpchMetadata
     private final Optional<String> destinationCatalog;
     private final Optional<String> destinationSchema;
     private final ConnectorExpressionEvaluator evaluator;
+    private final TpchQueryNodeCount queryNodeCount;
 
     private final Set<NullableValue> orderStatusNullableValues;
     private final Set<NullableValue> partTypeNullableValues;
@@ -142,6 +143,11 @@ public class TpchMetadata
     }
 
     @Inject
+    public TpchMetadata(TpchConfig config, JsonMapper mapper, ConnectorExpressionEvaluator evaluator, TpchQueryNodeCount queryNodeCount)
+    {
+        this(mapper, config.getColumnNaming(), config.getDecimalTypeMapping(), config.isPredicatePushdownEnabled(), config.isPartitioningEnabled(), Optional.ofNullable(config.getTableScanRedirectionCatalog()), Optional.ofNullable(config.getTableScanRedirectionSchema()), evaluator, queryNodeCount);
+    }
+
     public TpchMetadata(TpchConfig config, JsonMapper mapper, ConnectorExpressionEvaluator evaluator)
     {
         this(mapper, config.getColumnNaming(), config.getDecimalTypeMapping(), config.isPredicatePushdownEnabled(), config.isPartitioningEnabled(), Optional.ofNullable(config.getTableScanRedirectionCatalog()), Optional.ofNullable(config.getTableScanRedirectionSchema()), evaluator);
@@ -157,6 +163,20 @@ public class TpchMetadata
             Optional<String> destinationSchema,
             ConnectorExpressionEvaluator evaluator)
     {
+        this(jsonMapper, columnNaming, decimalTypeMapping, predicatePushdownEnabled, partitioningEnabled, destinationCatalog, destinationSchema, evaluator, new TpchQueryNodeCount());
+    }
+
+    private TpchMetadata(
+            JsonMapper jsonMapper,
+            ColumnNaming columnNaming,
+            DecimalTypeMapping decimalTypeMapping,
+            boolean predicatePushdownEnabled,
+            boolean partitioningEnabled,
+            Optional<String> destinationCatalog,
+            Optional<String> destinationSchema,
+            ConnectorExpressionEvaluator evaluator,
+            TpchQueryNodeCount queryNodeCount)
+    {
         ImmutableSet.Builder<String> tableNames = ImmutableSet.builder();
         for (TpchTable<?> tpchTable : TpchTable.getTables()) {
             tableNames.add(tpchTable.getTableName());
@@ -170,6 +190,7 @@ public class TpchMetadata
         this.destinationCatalog = destinationCatalog;
         this.destinationSchema = destinationSchema;
         this.evaluator = requireNonNull(evaluator, "evaluator is null");
+        this.queryNodeCount = requireNonNull(queryNodeCount, "queryNodeCount is null");
 
         partContainerNullableValues = PART_CONTAINER_VALUES.stream()
                 .map(value -> new NullableValue(getTrinoType(PartColumn.CONTAINER, decimalTypeMapping), value))
@@ -180,6 +201,12 @@ public class TpchMetadata
         orderStatusNullableValues = ORDER_STATUS_VALUES.stream()
                 .map(value -> new NullableValue(getTrinoType(OrderColumn.ORDER_STATUS, decimalTypeMapping), value))
                 .collect(toSet());
+    }
+
+    @Override
+    public void cleanupQuery(ConnectorSession session)
+    {
+        queryNodeCount.cleanupQuery(session);
     }
 
     private static StatisticsEstimator createStatisticsEstimator(JsonMapper jsonMapper)
