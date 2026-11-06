@@ -83,7 +83,11 @@ public class TestMetadataManager
     public void setUp()
             throws Exception
     {
-        queryRunner = TpchQueryRunner.builder().build();
+        queryRunner = TpchQueryRunner.builder()
+                // testMetadataWithDynamicCatalogs finishes far more than query.max-history queries within a few seconds,
+                // so a short expire age lets the server forget a finished query before its client fetched the final results
+                .addCoordinatorProperty("query.min-expire-age", "2m")
+                .build();
         queryRunner.installPlugin(new Plugin()
         {
             @Override

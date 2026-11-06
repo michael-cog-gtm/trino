@@ -302,8 +302,10 @@ public class TestingTrinoServer
                 }
             }
 
-            // Reduce memory footprint in tests
-            serverProperties.put("query.min-expire-age", "5s");
+            if (!properties.containsKey("query.min-expire-age")) {
+                // Reduce memory footprint in tests
+                serverProperties.put("query.min-expire-age", "5s");
+            }
         }
 
         serverProperties.put("optimizer.ignore-stats-calculator-failures", "false");
