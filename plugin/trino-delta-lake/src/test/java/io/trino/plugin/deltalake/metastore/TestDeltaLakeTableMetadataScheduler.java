@@ -14,6 +14,7 @@
 package io.trino.plugin.deltalake.metastore;
 
 import com.google.common.collect.ImmutableMap;
+import io.airlift.units.Duration;
 import io.trino.Session;
 import io.trino.metastore.HiveMetastore;
 import io.trino.plugin.deltalake.TestingDeltaLakePlugin;
@@ -21,20 +22,18 @@ import io.trino.plugin.jmx.JmxPlugin;
 import io.trino.testing.AbstractTestQueryFramework;
 import io.trino.testing.DistributedQueryRunner;
 import io.trino.testing.QueryRunner;
-import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 
 import java.lang.reflect.InvocationTargetException;
 import java.nio.file.Path;
-import java.time.Duration;
 import java.util.Optional;
 import java.util.stream.IntStream;
 
 import static com.google.common.reflect.Reflection.newProxy;
-import static com.google.common.util.concurrent.Uninterruptibles.sleepUninterruptibly;
 import static io.trino.plugin.hive.metastore.file.TestingFileHiveMetastore.createTestingFileHiveMetastore;
 import static io.trino.testing.TestingSession.testSessionBuilder;
-import static java.time.temporal.ChronoUnit.SECONDS;
+import static io.trino.testing.assertions.Assert.assertEventually;
+import static java.util.concurrent.TimeUnit.SECONDS;
 
 final class TestDeltaLakeTableMetadataScheduler
         extends AbstractTestQueryFramework
@@ -76,7 +75,6 @@ final class TestDeltaLakeTableMetadataScheduler
     }
 
     @Test
-    @Disabled // TODO Enable after fixing the flaky assertion with JMX
     void testFailureStopScheduler()
     {
         String coordinatorId = (String) computeScalar("SELECT node_id FROM system.runtime.nodes WHERE coordinator = true");
@@ -93,12 +91,12 @@ final class TestDeltaLakeTableMetadataScheduler
             assertUpdate("ALTER TABLE test_" + i + " RENAME COLUMN x to y");
             assertUpdate("COMMENT ON TABLE test_" + i + " IS 'test comment'");
         });
-        sleepUninterruptibly(Duration.of(1, SECONDS));
 
-        assertQuery(
+        // The failed metadata updates are processed asynchronously by the scheduler, so wait for it to stop
+        assertEventually(new Duration(30, SECONDS), () -> assertQuery(
                 "SELECT shutdown FROM jmx.current.\"trino.plugin.deltalake.metastore:catalog=delta,name=delta,type=deltalaketablemetadatascheduler\" " +
                         "WHERE node = '" + coordinatorId + "'",
-                "VALUES true");
+                "VALUES true"));
 
         // Metadata should return the correct values regardless of the scheduler status
         assertQuery(
